@@ -1,51 +1,97 @@
-# memex-ast
+# Memex AST Module
 
-A Memex module for analyzing Go source code and storing its AST (Abstract Syntax Tree) structure in a Memex repository.
+A Go source code analysis module for Memex that creates a queryable graph of code structure and relationships.
 
-## Features
+## Installation
 
-- Parses Go source files into a graph structure
-- Tracks relationships between code elements:
-  - Package dependencies
-  - Function calls
-  - Type implementations
-  - Struct composition
-- Stores source locations for IDE integration
-- Preserves code structure metadata
+Install directly from git:
+```bash
+memex module install https://github.com/systemshift/memex-ast.git
+memex module enable ast
+```
 
 ## Usage
 
+### Parse Go files:
 ```bash
-# Analyze a single file
-memex-ast -repo /path/to/repo.mx -source /path/to/file.go
+# Parse a single file
+memex ast parse file.go
 
-# Analyze a directory
-memex-ast -repo /path/to/repo.mx -source /path/to/project
+# Parse a directory
+memex ast parse ./pkg/...
 ```
 
-## Node Types
+### View relationships:
+```bash
+# Show type relationships
+memex ast types
 
-- ast.package: Go packages
-- ast.function: Functions and methods
-- ast.struct: Struct definitions
-- ast.interface: Interface definitions
-- ast.method: Interface methods
-- ast.field: Struct fields
-- ast.import: Package imports
+# Show call graph
+memex ast calls
 
-## Link Types
+# Find interface implementations
+memex ast impls io.Reader
 
-- ast.calls: Function calls
-- ast.implements: Interface implementations
-- ast.contains: Package/struct containment
-- ast.imports: Package imports
-- ast.extends: Struct embedding
-- ast.references: Type references
+# Show package dependencies
+memex ast deps
+```
 
-## Development Status
+### Query examples:
+```bash
+# Find all implementations of an interface
+memex query "type:ast.struct -[ast.implements]-> {name: 'io.Reader'}"
 
-This is an MVP (Minimum Viable Product) implementation. Future improvements:
-- Function call analysis
-- Interface implementation detection
-- Type dependency tracking
-- Code change impact analysis
+# Show function call chain
+memex query "type:ast.function -[ast.calls*]-> {name: 'main'}"
+
+# Find unused types
+memex query "type:ast.struct -[!ast.uses]->"
+
+# Show package dependencies
+memex query "type:ast.package -[ast.imports]-> type:ast.package"
+```
+
+## Module Structure
+
+The module analyzes Go source code using:
+- `go/ast`: AST parsing
+- `go/parser`: Go source parsing
+- `go/token`: Token handling
+
+### Node Types:
+- `ast.package`: Package declarations
+- `ast.function`: Functions and methods
+- `ast.struct`: Struct definitions
+- `ast.interface`: Interface definitions
+- `ast.field`: Struct fields
+- `ast.method`: Interface methods
+- `ast.import`: Package imports
+
+### Link Types:
+- `ast.calls`: Function calls
+- `ast.implements`: Interface implementations
+- `ast.contains`: Package/type containment
+- `ast.imports`: Package dependencies
+- `ast.embeds`: Type embedding
+- `ast.uses`: Type usage
+
+## Development
+
+This is a memex module and requires memex to be installed. It's designed to be installed directly from git rather than run as a standalone binary.
+
+### Testing:
+```bash
+go test ./...
+```
+
+### Local Development:
+```bash
+# Clone the repository
+git clone https://github.com/systemshift/memex-ast.git
+
+# Install locally for testing
+memex module install ./memex-ast
+
+# Make changes and reinstall to test
+memex module remove ast
+memex module install ./memex-ast

@@ -2,9 +2,11 @@ module memex-ast
 
 go 1.21
 
+require memex v0.0.0
+
 require (
-	golang.org/x/tools v0.16.1
-	github.com/systemshift/memex v0.0.0
+	golang.org/x/sys v0.27.0 // indirect
+	golang.org/x/term v0.26.0 // indirect
 )
 
-replace github.com/systemshift/memex => ../
+replace memex => ../

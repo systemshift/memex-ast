@@ -2,67 +2,103 @@ package ast
 
 import (
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
+	"path/filepath"
 
-	"github.com/systemshift/memex/pkg/memex/core"
+	"memex/internal/memex/core"
 )
 
-// Node types for AST nodes
+// Node types
 const (
 	NodeTypePackage   = "ast.package"
 	NodeTypeFunction  = "ast.function"
 	NodeTypeStruct    = "ast.struct"
 	NodeTypeInterface = "ast.interface"
-	NodeTypeMethod    = "ast.method"
 	NodeTypeField     = "ast.field"
+	NodeTypeMethod    = "ast.method"
 	NodeTypeImport    = "ast.import"
 )
 
-// Link types for AST relationships
+// Link types
 const (
-	LinkTypeCalls      = "ast.calls"      // Function calls another function
-	LinkTypeImplements = "ast.implements" // Struct implements interface
-	LinkTypeContains   = "ast.contains"   // Package contains type/func, struct contains field
-	LinkTypeImports    = "ast.imports"    // Package imports another package
-	LinkTypeExtends    = "ast.extends"    // Struct embeds another struct
-	LinkTypeReferences = "ast.references" // Type references another type
+	LinkTypeCalls      = "ast.calls"      // Function calls
+	LinkTypeImplements = "ast.implements" // Interface implementations
+	LinkTypeContains   = "ast.contains"   // Containment
+	LinkTypeImports    = "ast.imports"    // Package imports
+	LinkTypeEmbeds     = "ast.embeds"     // Type embedding
+	LinkTypeUses       = "ast.uses"       // Type usage
 )
 
-// Module implements the memex module interface for AST analysis
+// Module implements AST analysis
 type Module struct {
-	repo core.Repository
+	repo     core.Repository
+	parser   *Parser
+	analyzer *Analyzer
+	builder  *GraphBuilder
 }
 
 // NewModule creates a new AST module
 func NewModule(repo core.Repository) *Module {
-	return &Module{
-		repo: repo,
+	m := &Module{
+		repo:     repo,
+		parser:   NewParser(repo),
+		analyzer: NewAnalyzer(repo),
+		builder:  NewGraphBuilder(repo),
 	}
+
+	// Connect components
+	m.analyzer.SetParser(m.parser)
+	m.builder.SetAnalyzer(m.analyzer)
+
+	return m
 }
 
-// ID returns the module identifier
+// ID returns module identifier
 func (m *Module) ID() string {
 	return "ast"
 }
 
-// Name returns the human-readable name
+// Name returns human-readable name
 func (m *Module) Name() string {
 	return "AST Analysis"
 }
 
-// Description returns the module description
+// Description returns module description
 func (m *Module) Description() string {
-	return "Analyzes Go source code and stores AST structure in memex"
+	return "Analyzes Go source code structure and relationships"
 }
 
-// Capabilities returns the module capabilities
-func (m *Module) Capabilities() []core.ModuleCapability {
-	return []core.ModuleCapability{} // Empty slice instead of nil
+// Commands returns available module commands
+func (m *Module) Commands() []core.ModuleCommand {
+	return []core.ModuleCommand{
+		{
+			Name:        "parse",
+			Description: "Parse Go source files",
+			Usage:       "ast parse <path>",
+		},
+		{
+			Name:        "types",
+			Description: "Show type relationships",
+			Usage:       "ast types [type-name]",
+		},
+		{
+			Name:        "calls",
+			Description: "Show function call graph",
+			Usage:       "ast calls [function-name]",
+		},
+		{
+			Name:        "impls",
+			Description: "Find interface implementations",
+			Usage:       "ast impls <interface-name>",
+		},
+		{
+			Name:        "deps",
+			Description: "Show package dependencies",
+			Usage:       "ast deps [package-path]",
+		},
+	}
 }
 
-// ValidateNodeType checks if a node type is valid for this module
+// ValidateNodeType validates node types
 func (m *Module) ValidateNodeType(nodeType string) bool {
 	switch nodeType {
 	case NodeTypePackage, NodeTypeFunction, NodeTypeStruct,
@@ -74,11 +110,11 @@ func (m *Module) ValidateNodeType(nodeType string) bool {
 	}
 }
 
-// ValidateLinkType checks if a link type is valid for this module
+// ValidateLinkType validates link types
 func (m *Module) ValidateLinkType(linkType string) bool {
 	switch linkType {
 	case LinkTypeCalls, LinkTypeImplements, LinkTypeContains,
-		LinkTypeImports, LinkTypeExtends, LinkTypeReferences:
+		LinkTypeImports, LinkTypeEmbeds, LinkTypeUses:
 		return true
 	default:
 		return false
@@ -87,175 +123,128 @@ func (m *Module) ValidateLinkType(linkType string) bool {
 
 // ValidateMetadata validates module-specific metadata
 func (m *Module) ValidateMetadata(meta map[string]interface{}) error {
-	return nil // No special validation yet
-}
-
-// ParseFile parses a Go source file and stores its AST structure
-func (m *Module) ParseFile(filename string) error {
-	// Create file set for position information
-	fset := token.NewFileSet()
-
-	// Parse the Go source file
-	file, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
-	if err != nil {
-		return fmt.Errorf("parsing file: %w", err)
-	}
-
-	// Create package node
-	pkgMeta := map[string]interface{}{
-		"module":   m.ID(),
-		"filename": filename,
-	}
-	pkgID, err := m.repo.AddNode([]byte(file.Name.Name), NodeTypePackage, pkgMeta)
-	if err != nil {
-		return fmt.Errorf("adding package node: %w", err)
-	}
-
-	// Process imports
-	for _, imp := range file.Imports {
-		importPath := imp.Path.Value
-		importMeta := map[string]interface{}{
-			"module": m.ID(),
-			"path":   importPath,
-		}
-		if imp.Name != nil {
-			importMeta["alias"] = imp.Name.Name
-		}
-
-		// Create import node
-		importID, err := m.repo.AddNode([]byte(importPath), NodeTypeImport, importMeta)
-		if err != nil {
-			return fmt.Errorf("adding import node: %w", err)
-		}
-
-		// Link import to package
-		err = m.repo.AddLink(pkgID, importID, LinkTypeImports, nil)
-		if err != nil {
-			return fmt.Errorf("adding import link: %w", err)
-		}
-	}
-
-	// Process declarations
-	for _, decl := range file.Decls {
-		if err := m.processDecl(pkgID, fset, decl); err != nil {
-			return fmt.Errorf("processing declaration: %w", err)
-		}
-	}
-
+	// No special validation needed for AST metadata
 	return nil
 }
 
-// processDecl processes an AST declaration
-func (m *Module) processDecl(pkgID string, fset *token.FileSet, decl ast.Decl) error {
-	switch d := decl.(type) {
-	case *ast.FuncDecl:
-		// Process function declaration
-		funcMeta := map[string]interface{}{
-			"module": m.ID(),
-			"name":   d.Name.Name,
-			"pos":    fset.Position(d.Pos()).String(),
+// HandleCommand handles module commands
+func (m *Module) HandleCommand(cmd string, args []string) error {
+	switch cmd {
+	case "parse":
+		if len(args) < 1 {
+			return fmt.Errorf("path required")
 		}
-		if d.Recv != nil {
-			funcMeta["receiver"] = getTypeString(d.Recv.List[0].Type)
+		return m.Parse(args[0])
+
+	case "types":
+		typeName := ""
+		if len(args) > 0 {
+			typeName = args[0]
 		}
+		return m.ShowTypes(typeName)
 
-		funcID, err := m.repo.AddNode([]byte(d.Name.Name), NodeTypeFunction, funcMeta)
-		if err != nil {
-			return fmt.Errorf("adding function node: %w", err)
+	case "calls":
+		funcName := ""
+		if len(args) > 0 {
+			funcName = args[0]
 		}
+		return m.ShowCalls(funcName)
 
-		// Link function to package
-		err = m.repo.AddLink(pkgID, funcID, LinkTypeContains, nil)
-		if err != nil {
-			return fmt.Errorf("adding function link: %w", err)
+	case "impls":
+		if len(args) < 1 {
+			return fmt.Errorf("interface name required")
 		}
+		return m.ShowImplementations(args[0])
 
-	case *ast.GenDecl:
-		for _, spec := range d.Specs {
-			switch s := spec.(type) {
-			case *ast.TypeSpec:
-				// Process type declaration
-				switch t := s.Type.(type) {
-				case *ast.StructType:
-					// Process struct
-					structMeta := map[string]interface{}{
-						"module": m.ID(),
-						"name":   s.Name.Name,
-						"pos":    fset.Position(s.Pos()).String(),
-					}
-					structID, err := m.repo.AddNode([]byte(s.Name.Name), NodeTypeStruct, structMeta)
-					if err != nil {
-						return fmt.Errorf("adding struct node: %w", err)
-					}
-
-					// Link struct to package
-					err = m.repo.AddLink(pkgID, structID, LinkTypeContains, nil)
-					if err != nil {
-						return fmt.Errorf("adding struct link: %w", err)
-					}
-
-					// Process struct fields
-					for _, field := range t.Fields.List {
-						fieldMeta := map[string]interface{}{
-							"module": m.ID(),
-							"type":   getTypeString(field.Type),
-							"pos":    fset.Position(field.Pos()).String(),
-						}
-						if len(field.Names) > 0 {
-							fieldMeta["name"] = field.Names[0].Name
-						}
-
-						fieldID, err := m.repo.AddNode([]byte(fieldMeta["type"].(string)), NodeTypeField, fieldMeta)
-						if err != nil {
-							return fmt.Errorf("adding field node: %w", err)
-						}
-
-						// Link field to struct
-						err = m.repo.AddLink(structID, fieldID, LinkTypeContains, nil)
-						if err != nil {
-							return fmt.Errorf("adding field link: %w", err)
-						}
-					}
-
-				case *ast.InterfaceType:
-					// Process interface
-					interfaceMeta := map[string]interface{}{
-						"module": m.ID(),
-						"name":   s.Name.Name,
-						"pos":    fset.Position(s.Pos()).String(),
-					}
-					interfaceID, err := m.repo.AddNode([]byte(s.Name.Name), NodeTypeInterface, interfaceMeta)
-					if err != nil {
-						return fmt.Errorf("adding interface node: %w", err)
-					}
-
-					// Link interface to package
-					err = m.repo.AddLink(pkgID, interfaceID, LinkTypeContains, nil)
-					if err != nil {
-						return fmt.Errorf("adding interface link: %w", err)
-					}
-				}
-			}
+	case "deps":
+		pkgPath := ""
+		if len(args) > 0 {
+			pkgPath = args[0]
 		}
-	}
+		return m.ShowDependencies(pkgPath)
 
-	return nil
-}
-
-// getTypeString returns a string representation of an AST type
-func getTypeString(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		return t.Name
-	case *ast.StarExpr:
-		return "*" + getTypeString(t.X)
-	case *ast.SelectorExpr:
-		return getTypeString(t.X) + "." + t.Sel.Name
-	case *ast.ArrayType:
-		return "[]" + getTypeString(t.Elt)
-	case *ast.MapType:
-		return "map[" + getTypeString(t.Key) + "]" + getTypeString(t.Value)
 	default:
-		return fmt.Sprintf("%T", expr)
+		return fmt.Errorf("unknown command: %s", cmd)
 	}
+}
+
+// Parse parses Go source files
+func (m *Module) Parse(path string) error {
+	// Resolve absolute path
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("resolving path: %w", err)
+	}
+
+	// Parse files
+	if err := m.parser.ParsePath(absPath); err != nil {
+		return fmt.Errorf("parsing files: %w", err)
+	}
+
+	// Analyze relationships
+	if err := m.analyzer.Analyze(); err != nil {
+		return fmt.Errorf("analyzing code: %w", err)
+	}
+
+	// Build graph
+	if err := m.builder.Build(); err != nil {
+		return fmt.Errorf("building graph: %w", err)
+	}
+
+	return nil
+}
+
+// ShowTypes shows type relationships
+func (m *Module) ShowTypes(typeName string) error {
+	// Query type relationships
+	var query string
+	if typeName != "" {
+		query = fmt.Sprintf(`type:ast.struct name:"%s"`, typeName)
+	} else {
+		query = "type:ast.struct"
+	}
+
+	// TODO: Execute query
+	fmt.Printf("Types query: %s\n", query)
+	return nil
+}
+
+// ShowCalls shows function call graph
+func (m *Module) ShowCalls(funcName string) error {
+	// Query call graph
+	var query string
+	if funcName != "" {
+		query = fmt.Sprintf(`type:ast.function name:"%s" -[ast.calls*]->`, funcName)
+	} else {
+		query = "type:ast.function -[ast.calls]-> type:ast.function"
+	}
+
+	// TODO: Execute query
+	fmt.Printf("Calls query: %s\n", query)
+	return nil
+}
+
+// ShowImplementations shows interface implementations
+func (m *Module) ShowImplementations(interfaceName string) error {
+	// Query implementations
+	query := fmt.Sprintf(`type:ast.struct -[ast.implements]-> {type:ast.interface name:"%s"}`, interfaceName)
+
+	// TODO: Execute query
+	fmt.Printf("Implementations query: %s\n", query)
+	return nil
+}
+
+// ShowDependencies shows package dependencies
+func (m *Module) ShowDependencies(pkgPath string) error {
+	// Query dependencies
+	var query string
+	if pkgPath != "" {
+		query = fmt.Sprintf(`{type:ast.package path:"%s"} -[ast.imports]-> type:ast.package`, pkgPath)
+	} else {
+		query = "type:ast.package -[ast.imports]-> type:ast.package"
+	}
+
+	// TODO: Execute query
+	fmt.Printf("Dependencies query: %s\n", query)
+	return nil
 }
