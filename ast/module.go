@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"memex/internal/memex/core"
+	"github.com/systemshift/memex/pkg/sdk/types"
 )
 
 // Node types
@@ -30,26 +30,10 @@ const (
 
 // Module implements AST analysis
 type Module struct {
-	repo     core.Repository
+	repo     types.Repository
 	parser   *Parser
 	analyzer *Analyzer
 	builder  *GraphBuilder
-}
-
-// NewModule creates a new AST module
-func NewModule(repo core.Repository) *Module {
-	m := &Module{
-		repo:     repo,
-		parser:   NewParser(repo),
-		analyzer: NewAnalyzer(repo),
-		builder:  NewGraphBuilder(repo),
-	}
-
-	// Connect components
-	m.analyzer.SetParser(m.parser)
-	m.builder.SetAnalyzer(m.analyzer)
-
-	return m
 }
 
 // ID returns module identifier
@@ -68,8 +52,8 @@ func (m *Module) Description() string {
 }
 
 // Commands returns available module commands
-func (m *Module) Commands() []core.ModuleCommand {
-	return []core.ModuleCommand{
+func (m *Module) Commands() []types.ModuleCommand {
+	return []types.ModuleCommand{
 		{
 			Name:        "parse",
 			Description: "Parse Go source files",
