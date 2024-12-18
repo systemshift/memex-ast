@@ -1,4 +1,4 @@
-module memex-ast
+module github.com/systemshift/memex-ast
 
 go 1.21
 
