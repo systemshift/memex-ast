@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 
-	"github.com/systemshift/memex/pkg/sdk/types"
+	"github.com/systemshift/memex/pkg/module"
 )
 
 // TypeInfo holds type analysis information
@@ -18,7 +18,7 @@ type TypeInfo struct {
 
 // Analyzer analyzes code relationships
 type Analyzer struct {
-	repo   types.Repository
+	repo   module.Repository
 	parser *Parser
 	types  map[string]*TypeInfo
 	calls  map[string][]string
@@ -26,7 +26,7 @@ type Analyzer struct {
 }
 
 // NewAnalyzer creates a new analyzer
-func NewAnalyzer(repo types.Repository) *Analyzer {
+func NewAnalyzer(repo module.Repository) *Analyzer {
 	return &Analyzer{
 		repo:  repo,
 		types: make(map[string]*TypeInfo),

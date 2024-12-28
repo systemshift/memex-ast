@@ -7,18 +7,18 @@ import (
 	"go/token"
 	"os"
 
-	"github.com/systemshift/memex/pkg/sdk/types"
+	"github.com/systemshift/memex/pkg/module"
 )
 
 // Parser handles Go source parsing
 type Parser struct {
 	fset  *token.FileSet
-	repo  types.Repository
+	repo  module.Repository
 	files map[string]*ast.File
 }
 
 // NewParser creates a new parser
-func NewParser(repo types.Repository) *Parser {
+func NewParser(repo module.Repository) *Parser {
 	return &Parser{
 		fset:  token.NewFileSet(),
 		repo:  repo,

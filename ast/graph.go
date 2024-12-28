@@ -3,12 +3,12 @@ package ast
 import (
 	"fmt"
 
-	"github.com/systemshift/memex/pkg/sdk/types"
+	"github.com/systemshift/memex/pkg/module"
 )
 
 // GraphBuilder builds the Memex graph from analysis
 type GraphBuilder struct {
-	repo     types.Repository
+	repo     module.Repository
 	analyzer *Analyzer
 	// Node ID tracking
 	packages  map[string]string
@@ -17,7 +17,7 @@ type GraphBuilder struct {
 }
 
 // NewGraphBuilder creates a new graph builder
-func NewGraphBuilder(repo types.Repository) *GraphBuilder {
+func NewGraphBuilder(repo module.Repository) *GraphBuilder {
 	return &GraphBuilder{
 		repo:      repo,
 		packages:  make(map[string]string),
